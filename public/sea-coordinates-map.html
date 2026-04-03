@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=3.0, user-scalable=yes">
+<title>한중어업협정 잠정조치수역 해역좌표</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif;
+    background: #0a1628;
+    color: #e0e8f0;
+  }
+  .header {
+    background: linear-gradient(135deg, #0d2137 0%, #1a3a5c 100%);
+    padding: 14px 16px;
+    text-align: center;
+    border-bottom: 2px solid #2a5a8a;
+    position: relative;
+    z-index: 1000;
+  }
+  .header h1 {
+    font-size: 16px;
+    font-weight: 700;
+    color: #7ec8f0;
+    margin-bottom: 4px;
+  }
+  .header p {
+    font-size: 11px;
+    color: #8a9bb0;
+  }
+  #map {
+    width: 100%;
+    height: calc(100vh - 120px);
+    z-index: 1;
+  }
+  .info-bar {
+    background: linear-gradient(135deg, #0d2137 0%, #1a3a5c 100%);
+    padding: 10px 16px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-top: 2px solid #2a5a8a;
+    font-size: 11px;
+    position: relative;
+    z-index: 1000;
+  }
+  .info-bar .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .legend-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    display: inline-block;
+  }
+  .legend-dot.zone { background: rgba(255, 165, 0, 0.6); border: 2px solid #ffa500; }
+  .legend-dot.point { background: #ff4444; border: 2px solid #ff6666; }
+  .coord-popup {
+    font-family: -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', sans-serif;
+    min-width: 160px;
+  }
+  .coord-popup .point-name {
+    font-size: 15px;
+    font-weight: 700;
+    color: #1a3a5c;
+    margin-bottom: 6px;
+    padding-bottom: 4px;
+    border-bottom: 2px solid #7ec8f0;
+  }
+  .coord-popup .coord-row {
+    font-size: 12px;
+    color: #333;
+    line-height: 1.6;
+  }
+  .coord-popup .label {
+    font-weight: 600;
+    color: #0d5b94;
+  }
+  .toggle-btn {
+    background: #2a5a8a;
+    color: #fff;
+    border: none;
+    padding: 6px 12px;
+    border-radius: 4px;
+    font-size: 11px;
+    cursor: pointer;
+  }
+  .toggle-btn:active {
+    background: #3a7aba;
+  }
+
+  /* Custom marker labels */
+  .marker-label {
+    background: rgba(10, 22, 40, 0.85);
+    color: #7ec8f0;
+    font-size: 11px;
+    font-weight: 700;
+    padding: 2px 6px;
+    border-radius: 3px;
+    border: 1px solid #2a5a8a;
+    white-space: nowrap;
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>한중어업협정 잠정조치수역</h1>
+  <p>Provisional Measures Zone - Korea-China Fishery Agreement</p>
+</div>
+
+<div id="map"></div>
+
+<div class="info-bar">
+  <div class="legend-item">
+    <span class="legend-dot zone"></span>
+    <span>잠정조치수역</span>
+  </div>
+  <div class="legend-item">
+    <span class="legend-dot point"></span>
+    <span>좌표점 (A1~A17)</span>
+  </div>
+  <button class="toggle-btn" id="toggleLabels">라벨 표시/숨김</button>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+// 좌표 데이터 (도, 분, 초 → 십진법 변환)
+function dms(d, m, s) {
+  return d + m / 60 + s / 3600;
+}
+
+const points = [
+  { name: 'A1',  lat: dms(37, 0, 0),    lng: dms(123, 40, 0),   latStr: '북위 37도 00분',         lngStr: '동경 123도 40분' },
+  { name: 'A2',  lat: dms(36, 22, 23),   lng: dms(123, 10, 52),  latStr: '북위 36도 22분 23초',    lngStr: '동경 123도 10분 52초' },
+  { name: 'A3',  lat: dms(35, 30, 0),    lng: dms(122, 11, 54),  latStr: '북위 35도 30분',         lngStr: '동경 122도 11분 54초' },
+  { name: 'A4',  lat: dms(35, 30, 0),    lng: dms(122, 1, 54),   latStr: '북위 35도 30분',         lngStr: '동경 122도 01분 54초' },
+  { name: 'A5',  lat: dms(34, 0, 0),     lng: dms(122, 1, 54),   latStr: '북위 34도 00분',         lngStr: '동경 122도 01분 54초' },
+  { name: 'A6',  lat: dms(34, 0, 0),     lng: dms(122, 11, 54),  latStr: '북위 34도 00분',         lngStr: '동경 122도 11분 54초' },
+  { name: 'A7',  lat: dms(33, 20, 0),    lng: dms(122, 41, 0),   latStr: '북위 33도 20분',         lngStr: '동경 122도 41분' },
+  { name: 'A8',  lat: dms(32, 20, 0),    lng: dms(123, 45, 0),   latStr: '북위 32도 20분',         lngStr: '동경 123도 45분' },
+  { name: 'A9',  lat: dms(32, 11, 0),    lng: dms(123, 49, 30),  latStr: '북위 32도 11분',         lngStr: '동경 123도 49분 30초' },
+  { name: 'A10', lat: dms(32, 11, 0),    lng: dms(125, 25, 0),   latStr: '북위 32도 11분',         lngStr: '동경 125도 25분' },
+  { name: 'A11', lat: dms(33, 20, 0),    lng: dms(124, 8, 0),    latStr: '북위 33도 20분',         lngStr: '동경 124도 08분' },
+  { name: 'A12', lat: dms(34, 0, 0),     lng: dms(124, 0, 30),   latStr: '북위 34도 00분',         lngStr: '동경 124도 00분 30초' },
+  { name: 'A13', lat: dms(35, 0, 0),     lng: dms(124, 7, 30),   latStr: '북위 35도 00분',         lngStr: '동경 124도 07분 30초' },
+  { name: 'A14', lat: dms(35, 30, 0),    lng: dms(124, 30, 0),   latStr: '북위 35도 30분',         lngStr: '동경 124도 30분' },
+  { name: 'A15', lat: dms(36, 45, 0),    lng: dms(124, 30, 0),   latStr: '북위 36도 45분',         lngStr: '동경 124도 30분' },
+  { name: 'A16', lat: dms(37, 0, 0),     lng: dms(124, 20, 0),   latStr: '북위 37도 00분',         lngStr: '동경 124도 20분' },
+  { name: 'A17', lat: dms(37, 0, 0),     lng: dms(123, 40, 0),   latStr: '북위 37도 00분',         lngStr: '동경 123도 40분' },
+];
+
+// 지도 초기화 - 한반도 서해 중심
+const map = L.map('map', {
+  center: [34.5, 123.5],
+  zoom: 6,
+  minZoom: 5,
+  maxZoom: 12,
+  zoomControl: false,
+  attributionControl: true
+});
+
+// 줌 컨트롤 우측 하단
+L.control.zoom({ position: 'bottomright' }).addTo(map);
+
+// 타일 레이어 (OpenStreetMap)
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  attribution: '&copy; OpenStreetMap contributors',
+  maxZoom: 18
+}).addTo(map);
+
+// 잠정조치수역 폴리곤
+const zoneCoords = points.map(p => [p.lat, p.lng]);
+const zone = L.polygon(zoneCoords, {
+  color: '#ffa500',
+  weight: 3,
+  opacity: 0.9,
+  fillColor: '#ffa500',
+  fillOpacity: 0.15,
+  dashArray: '8, 6'
+}).addTo(map);
+
+// 좌표점 마커 및 라벨
+const markers = [];
+const labels = [];
+
+points.forEach((p, i) => {
+  // 원형 마커
+  const marker = L.circleMarker([p.lat, p.lng], {
+    radius: 7,
+    fillColor: '#ff4444',
+    color: '#fff',
+    weight: 2,
+    opacity: 1,
+    fillOpacity: 0.9
+  }).addTo(map);
+
+  // 팝업
+  marker.bindPopup(`
+    <div class="coord-popup">
+      <div class="point-name">${p.name}</div>
+      <div class="coord-row"><span class="label">위도:</span> ${p.latStr}</div>
+      <div class="coord-row"><span class="label">경도:</span> ${p.lngStr}</div>
+      <div class="coord-row" style="margin-top:4px; font-size:11px; color:#666;">
+        ${p.lat.toFixed(4)}°N, ${p.lng.toFixed(4)}°E
+      </div>
+    </div>
+  `, { closeButton: true, className: '' });
+
+  markers.push(marker);
+
+  // 라벨 (DivIcon)
+  const label = L.marker([p.lat, p.lng], {
+    icon: L.divIcon({
+      className: 'marker-label',
+      html: p.name,
+      iconSize: null,
+      iconAnchor: [-8, 12]
+    }),
+    interactive: false
+  }).addTo(map);
+
+  labels.push(label);
+});
+
+// 지도 범위를 수역에 맞춤
+map.fitBounds(zone.getBounds().pad(0.15));
+
+// 라벨 토글
+let labelsVisible = true;
+document.getElementById('toggleLabels').addEventListener('click', () => {
+  labelsVisible = !labelsVisible;
+  labels.forEach(label => {
+    if (labelsVisible) {
+      label.addTo(map);
+    } else {
+      map.removeLayer(label);
+    }
+  });
+});
+
+// 줌 레벨에 따라 라벨 크기 조절
+map.on('zoomend', () => {
+  const zoom = map.getZoom();
+  const show = zoom >= 6;
+  labels.forEach(label => {
+    if (labelsVisible && show) {
+      label.addTo(map);
+    } else {
+      map.removeLayer(label);
+    }
+  });
+});
+</script>
+</body>
+</html>
